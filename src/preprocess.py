@@ -23,5 +23,11 @@ for r,d,f in os.walk("images"):
         str = str[:-1]
         if str in ingredientsdict:
             images.append(np.asarray(Image.open(os.path.join(r, file))))
-            ingredientlist.append(ingredientsdict[str])
-print(len(images))
+            ingredientlist.append(ingredientsdict[str].split(","))
+vocabulary = {}
+inc = 0
+for inglist in ingredientslist:
+    for ingredient in ingredientslist:
+        if not ingredient in vocabulary:
+            vocabulary[ingredient] = inc
+            inc += 1
