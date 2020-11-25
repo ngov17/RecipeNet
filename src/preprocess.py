@@ -12,8 +12,18 @@ for line in ingredientsfile:
 ingredientsdict = {}
 for i in range(len(ingredients)):
     ingredientsdict[classes[i]] = ingredients[i]
-images = []
-ingredientlist = []
+trainimages = []
+trainingredientlist = []
+testimages = []
+testingredientlist = []
+trainlist = []
+testlist = []
+trainfile = open("annotations/train_images.txt", "r")
+testfile = open("annotations/test_images.txt", "r")
+for line in trainfile:
+    trainlist.append("images/"+line.rstrip())
+for line in testfile:
+    testlist.append("images/"+line.rstrip())
 for r,d,f in os.walk("images"):
     for file in f:
         name = file.split("_")[1:-1]
@@ -22,12 +32,11 @@ for r,d,f in os.walk("images"):
             str += word + " "
         str = str[:-1]
         if str in ingredientsdict:
-            images.append(np.asarray(Image.open(os.path.join(r, file))))
-            ingredientlist.append(ingredientsdict[str].split(","))
-vocabulary = {}
-inc = 0
-for inglist in ingredientslist:
-    for ingredient in ingredientslist:
-        if not ingredient in vocabulary:
-            vocabulary[ingredient] = inc
-            inc += 1
+            if os.path.join(r, file) in trainlist:
+                trainimages.append(np.asarray(Image.open(os.path.join(r, file))))
+                trainingredientlist.append(ingredientsdict[str].split(","))
+            elif os.path.join(r, file) in testlist:
+                testimages.append(np.asarray(Image.open(os.path.join(r, file))))
+                testingredientlist.append(ingredientsdict[str].split(","))
+print(len(trainimages))
+print(len(testimages))
