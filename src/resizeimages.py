@@ -13,3 +13,4 @@ def resize_images(images):
         x, y = image.size
         image = image.crop((int(float(x-224)/2.0), int(float(y-224)/2.0), 224+int(float(x-224)/2.0), 224+int(float(y-224)/2.0)))
         out.append(np.asarray(image))
+    return out
