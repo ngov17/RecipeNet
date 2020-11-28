@@ -12,5 +12,5 @@ class EncoderCNN(tf.keras.Model):
         else:
             raw_conv_feats = tf.stop_gradient(self.resnet(images))
         features = self.drop2D(self.conv2D(raw_conv_feats))
-        features = tf.reshape(features, [features.size[0], -1, features.size[1]])
+        features = tf.reshape(features, [features.shape[0], -1, features.size[1]])
         return features
