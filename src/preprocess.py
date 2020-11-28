@@ -2,11 +2,11 @@ import sys, os
 import numpy as np
 from PIL import Image
 
-classes_path = "/Users/nishant/Desktop/Recipes5k/annotations/classes_Recipes5k.txt"
-ingredients_path = "/Users/nishant/Desktop/Recipes5k/annotations/ingredients_simplified_Recipes5k.txt"
-images = "/Users/nishant/Desktop/Recipes5k/images/"
-train_image_path = "/Users/nishant/Desktop/Recipes5k/annotations/train_images.txt"
-test_image_path = "/Users/nishant/Desktop/Recipes5k/annotations/test_images.txt"
+classes_path = "../data/classes_Recipes5k.txt"
+ingredients_path = "../data/ingredients_simplified_Recipes5k.txt"
+images = "../data/images/"
+train_image_path = "../data/train_images.txt"
+test_image_path = "../data/test_images.txt"
 
 PAD_TOKEN = "*PAD*"
 STOP_TOKEN = "*STOP*"
@@ -33,6 +33,13 @@ def resize_images(images):
         out[i] = np.asarray(image)
     return out
 
+
+def normalize_images(images):
+    """
+    Normalizes each pixel in an image to a value between 0-1 by dividing each pixel by 255.0
+    """
+
+    return images / 255.0
 
 def pad_ingredients(ingredient_list):
     """
@@ -116,8 +123,8 @@ def get_data(classes_path, ingredients_path, images, train_image_path, test_imag
                     test_ingredient_list.append(ingredients_dict[str].split(","))
 
     # resize images to (224, 224, 3)
-    train_images = resize_images(train_images)
-    test_images = resize_images(test_images)
+    train_images = normalize_images(resize_images(train_images))
+    test_images = normalize_images(resize_images(test_images))
 
     vocab, pad_token_idx = build_vocab(train_ingredient_list + test_ingredient_list)
     padded_train_ingredients = np.array(pad_ingredients(train_ingredient_list))
