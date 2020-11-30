@@ -67,7 +67,15 @@ class Ingredient_Decoder(tf.keras.Model):
                 pred_ings_inp[:, i + 1] = pred_ings[:, i]
             print(pred_ings[:, i])
 
-        return pred_ings, preds, np.stack(prbs, axis=1)
+        return pred_ings, preds, tf.stack(prbs, axis=1)
+
+        # Teacher Forcing:
+        # img_features = self.image_encoder(images)
+        # embeddings_ing = tf.nn.embedding_lookup(self.E, ingredients)
+        # decoded_layer = self.ing_decoder(embeddings_ing, img_features)
+        # prbs = self.dense1(decoded_layer)
+        #
+        # return prbs
 
     def get_decoded_ings(self, img_features, ingredients):
 
@@ -132,13 +140,15 @@ def main():
         train_ings[i] = train_ingredients[i][:20]
         train_ings_label[i] = train_ingredients[i][-20:]
 
-    for j in range(0, train_ingredients.shape[0], 100):
+    for j in range(0, train_ingredients.shape[0] - 100, 100):
         train_img = train_image[j:j + 100]
         train = train_ings[j:j + 100]
         labels = train_ings_label[j:j + 100]
 
         with tf.GradientTape() as tape:
             pred_ings, preds, prbs = model(train_img, train)
+            # USE THIS VERSION IF USING TEACHER FORCING
+            # prbs = model(train_img, train)
             loss = model.loss(prbs, labels, EOS_INDEX)
             print("loss at step " + str(j) + " = " + str(loss.numpy()))
         gradients = tape.gradient(loss, model.trainable_variables)
