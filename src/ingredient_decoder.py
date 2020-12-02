@@ -47,11 +47,11 @@ class Ingredient_Decoder(tf.keras.Model):
         predicted_mask = np.zeros((self.batch_size, WINDOW_SZ, self.vocab_size))
         img_features = self.image_encoder(images)
         prbs = []
-        for i in range(ingredients.shape[1]):
+        for i in range(WINDOW_SZ): # iterating 20 times
             print(i)
             decoded_ings = self.get_decoded_ings(img_features, pred_ings_inp)
             preds.append(self.dense1(decoded_ings))
-            print(preds[i].shape)   # 100 * 20 * 906
+            print(preds[i].shape)   # 100 * 1 * 906
             # force preactivation of previously seen ingredients to be -inf
             if i != 0:
                 for k in range(i):
@@ -94,7 +94,7 @@ class Ingredient_Decoder(tf.keras.Model):
         accuracy = tf.reduce_mean(tf.boolean_mask(tf.cast(tf.equal(decoded_symbols, labels), dtype=tf.float32), mask))
         return accuracy
 
-    def loss(self, prbs, labels, eos_indx):
+    def loss(self, prbs, labels, pad_indx):
         """
         Calculates the model cross-entropy loss after one forward pass
         Please use reduce sum here instead of reduce mean to make things easier in calculating per symbol accuracy.
@@ -106,10 +106,14 @@ class Ingredient_Decoder(tf.keras.Model):
         bce = tf.keras.losses.BinaryCrossentropy()
         # EOS:
         eos_label = np.zeros_like(labels)
-        eos_label[labels == eos_indx] = 1
-        prb_eos = prbs[:, :, eos_indx]
+        eos_label[(labels == EOS_INDEX) ^ (labels == pad_indx)] = 1
+        prb_eos = prbs[:, :, EOS_INDEX]
         loss_eos = bce(eos_label, prb_eos)
-
+        print(loss_eos)
+        print(tf.math.reduce_sum(prbs, 1))
+        print(tf.math.reduce_sum(prbs, 2))
+        print(eos_label[0])
+        exit(0)
         # Ingredient Loss:
         pooled_prbs = tf.math.reduce_max(prbs, 1)   # 100 * 906
         ingr_labels = np.zeros_like(pooled_prbs)  # 100 * 906
@@ -118,6 +122,9 @@ class Ingredient_Decoder(tf.keras.Model):
             # for j in range(WINDOW_SZ):
             #     ingr_labels[i, labels[i][j]] = 1
         loss_ingrs = bce(ingr_labels, pooled_prbs)
+
+
+        print(loss_ingrs)
 
         return loss_eos + loss_ingrs
 

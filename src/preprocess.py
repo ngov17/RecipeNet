@@ -31,6 +31,7 @@ def resize_images(images):
         x, y = image.size
         image = image.crop((int(float(x-224)/2.0), int(float(y-224)/2.0), 224+int(float(x-224)/2.0), 224+int(float(y-224)/2.0)))
         out[i] = np.asarray(image)
+        i += 1
     return out
 
 
@@ -137,12 +138,12 @@ def get_data(classes_path, ingredients_path, images, train_image_path, test_imag
 
 
 # test
-train_image, train_ingredients, test_image, test_ingredients, vocab, pad_token_idx \
-    = get_data(classes_path, ingredients_path, images, train_image_path, test_image_path)
+# train_image, train_ingredients, test_image, test_ingredients, vocab, pad_token_idx \
+#     = get_data(classes_path, ingredients_path, images, train_image_path, test_image_path)
 # shapes and sizes of result:
-print(train_image.shape)
-print(train_ingredients.shape)
-print(test_image.shape)
-print(test_ingredients.shape)
-print(len(vocab))
-print(pad_token_idx)
+# print(train_image.shape)
+# print(train_ingredients.shape)
+# print(test_image.shape)
+# print(test_ingredients.shape)
+# print(len(vocab))
+# print(pad_token_idx)
