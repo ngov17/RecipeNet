@@ -23,7 +23,7 @@ class Ingredient_Decoder(tf.keras.Model):
         self.vocab_size = ing_vocab_size
 
         # Define batch size and optimizer/learning rate
-        self.batch_size = 100
+        self.batch_size = 32
         self.embedding_size = 512
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
 
@@ -197,10 +197,10 @@ def main():
     train_image = train_image[indices]
     train_ings_label = train_ings_label[indices]
 
-    for j in range(0, train_ingredients.shape[0] - 100, 100):
-        train_img = train_image[j:j + 100]
-        train = train_ings[j:j + 100]
-        labels = train_ings_label[j:j + 100]
+    for j in range(0, train_ingredients.shape[0] - model.batch_size, model.batch_size):
+        train_img = train_image[j:j + model.batch_size]
+        train = train_ings[j:j + model.batch_size]
+        labels = train_ings_label[j:j + model.batch_size]
 
         with tf.GradientTape() as tape:
             sampled_ids, logits = model(train_img, train)
@@ -212,9 +212,9 @@ def main():
         model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
     # model is trained
-    image = np.reshape(test_image[0], (1, -1))
-    image1 = np.reshape(test_image[127], (1, -1))
-
+    image = np.array([test_image[0]])
+    image1 = np.array([test_image[127]])
+    print(image.shape)
     ingr = [[train_ingredients[0][0]]]  # 1st token
 
     sampled_ids, logits = model.call(image, ingr)
@@ -226,13 +226,12 @@ def main():
     def print_ingredients(sampled_ids):
         ings = []
         for ing in sampled_ids:
-            ings.append(reverse_vocab[ing])
+            ings.append(reverse_vocab[ing.numpy()])
         return ings
 
     # print the image
-    image = test_image[0] * 255.0
-    image1 = test_image[127] * 255.0
-
+    image = test_image[0]
+    image1 = test_image[127]
     print("IMAGE 0 prediction :")
     print(print_ingredients(sampled_ids))
 
