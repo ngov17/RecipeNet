@@ -212,8 +212,8 @@ def main():
         model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
     # model is trained
-    image = test_image[0]
-    image1 = test_image[127]
+    image = np.reshape(test_image[0], (1, -1))
+    image1 = np.reshape(test_image[127], (1, -1))
 
     ingr = [[train_ingredients[0][0]]]  # 1st token
 
