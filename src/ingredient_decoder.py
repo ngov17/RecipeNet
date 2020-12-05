@@ -33,9 +33,12 @@ class Ingredient_Decoder(tf.keras.Model):
         self.E = \
             tf.Variable(tf.random.truncated_normal([self.vocab_size, self.embedding_size], stddev=.1))
 
-        # Create positional encoder layers
+        # Layers
         self.image_encoder = EncoderCNN(self.embedding_size)
         self.ing_decoder = transformer.Transformer_Block(self.embedding_size, True)
+        self.ing_decoder1 = transformer.Transformer_Block(self.embedding_size, True)
+        self.ing_decoder2 = transformer.Transformer_Block(self.embedding_size, True)
+        self.ing_decoder3 = transformer.Transformer_Block(self.embedding_size, True)
         self.dense1 = tf.keras.layers.Dense(self.vocab_size)
 
     def call(self, images, ingredients, teacher_forcing=False):
@@ -76,10 +79,13 @@ class Ingredient_Decoder(tf.keras.Model):
 
         if teacher_forcing:
             # Teacher Forcing:
-            img_features = self.image_encoder(images)
+            img_features = self.image_encoder(images, keep_cnn_gradients=True)
             embeddings_ing = tf.nn.embedding_lookup(self.E, ingredients)
-            decoded_layer = self.ing_decoder(embeddings_ing, img_features)
-            prbs = self.dense1(decoded_layer)
+            decoded_layer = self.ing_decoder(embeddings_ing, img_features)  # bsz * 1 * 512
+            decoded_layer1 = self.ing_decoder1(decoded_layer, img_features)
+            decoded_layer2 = self.ing_decoder2(decoded_layer1, img_features)
+            decoded_layer3 = self.ing_decoder3(decoded_layer2, img_features)
+            prbs = self.dense1(decoded_layer3)
 
             return prbs
         else:
@@ -123,9 +129,12 @@ class Ingredient_Decoder(tf.keras.Model):
         # since we are incrementally inputting ingredients into the model, we get the ing from the last time step:
         ingredients = ingredients[:, -1:] # batch_size * 1
 
-        embeddings_ing = tf.nn.embedding_lookup(self.E, ingredients)
-        decoded_layer = self.ing_decoder(embeddings_ing, img_features) # 100 * 1 * 512
-        prbs = self.dense1(decoded_layer) # 100 * 1 * 906
+        embeddings_ing = tf.nn.embedding_lookup(self.E, ingredients)   #
+        decoded_layer = self.ing_decoder(embeddings_ing, img_features)  # bsz * 1 * 512
+        decoded_layer1 = self.ing_decoder1(decoded_layer, img_features)
+        decoded_layer2 = self.ing_decoder2(decoded_layer1, img_features)
+        decoded_layer3 = self.ing_decoder3(decoded_layer2, img_features)
+        prbs = self.dense1(decoded_layer3)  # 100 * 1 * 906
 
         return prbs
 
@@ -158,7 +167,7 @@ class Ingredient_Decoder(tf.keras.Model):
         eos_head = np.zeros_like(labels)
         eos_head[(labels != PAD_INDEX) & (labels != EOS_INDEX)] = 1
         prb_eos = prbs[:, :, EOS_INDEX]
-        loss_eos = tf.reduce_sum(bce(eos_pos, prb_eos))
+        loss_eos = tf.reduce_sum(bce(eos_label, prb_eos))
         print(loss_eos)
         # Ingredient Loss:
         pooled_prbs = tf.math.reduce_max(prbs, 1)   # 100 * 906
@@ -208,8 +217,7 @@ def main():
     train_image = train_image[indices]
     train_ings_label = train_ings_label[indices]
 
-
-    num_epochs = 10
+    num_epochs = 1
     for n in range(num_epochs):
         print("Epoch " + str(n))
         for j in range(0, train_ingredients.shape[0] - 64, 64):
@@ -217,9 +225,9 @@ def main():
             train = train_ings[j:j + 64]
             labels = train_ings_label[j:j + 64]
             with tf.GradientTape() as tape:
-                # sampled_ids, logits = model(train_img, train)
+                sampled_ids, logits = model(train_img, train)
                 # USE THIS VERSION IF USING TEACHER FORCING
-                logits = model(train_img, train, teacher_forcing=True)
+                # logits = model(train_img, train, teacher_forcing=True)
                 loss = model.loss(logits, labels)
                 print("loss at step " + str(j) + " = " + str(loss.numpy()))
             gradients = tape.gradient(loss, model.trainable_variables)
