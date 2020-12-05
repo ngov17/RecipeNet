@@ -6,7 +6,7 @@ class EncoderCNN(tf.keras.Model):
     def __init__(self, embed_size, dropout=0.5):
         super(EncoderCNN, self).__init__()
         self.resnet = tf.keras.applications.ResNet50(include_top=False, weights='imagenet', input_shape=(224,224,3))
-        self.resnet.trainable = False
+        # self.resnet.trainable = False
         self.conv2D = tf.keras.layers.Conv2D(embed_size, 1)
         self.drop2D = tf.keras.layers.SpatialDropout2D(dropout)
 
