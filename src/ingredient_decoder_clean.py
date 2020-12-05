@@ -136,9 +136,7 @@ class Ingredient_Decoder(tf.keras.Model):
 
     def accuracy_function(self, prbs, labels, mask):
         """
-
         """
-
         decoded_symbols = tf.argmax(input=prbs, axis=2)
         accuracy = tf.reduce_mean(tf.boolean_mask(tf.cast(tf.equal(decoded_symbols, labels), dtype=tf.float32), mask))
         return accuracy

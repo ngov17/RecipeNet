@@ -1,6 +1,5 @@
 import sys, os
 import numpy as np
-import tensorflow as tf
 from PIL import Image
 from skimage import io, transform, img_as_float32
 import random
@@ -44,7 +43,7 @@ def get_image_batch(image_paths, is_train=True):
     param is_train: True if processing images for training (sample random image patch) or False if processing for testing (sample central image patch)
     return: a numpy array of size (len(image_paths), 224, 224, 3) containing the preprocessed images
     """
-    return tf.stack([preprocess_image(path, is_train) for path in image_paths], axis=0)
+    return np.stack([preprocess_image(path, is_train) for path in image_paths], axis=0)
 
 def pad_ingredients(ingredient_list):
     """
