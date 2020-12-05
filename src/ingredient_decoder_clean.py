@@ -194,9 +194,9 @@ def train(model, train_image_paths, train_ings, train_ings_labels, num_epochs=1,
             train_ing = train_ings[batch_indices]
             labels = train_ings_labels[batch_indices]
             with tf.GradientTape() as tape:
-                # sampled_ids, logits = model(train_img, train_ing)
+                sampled_ids, logits = model(train_img, train_ing)
                 # USE THIS VERSION IF USING TEACHER FORCING
-                logits = model(train_img, train_ing, teacher_forcing=True)
+                # logits = model(train_img, train_ing, teacher_forcing=True)
                 loss = model.loss(logits, labels)
                 print("loss at step" + str(j) + " = " + str(loss.numpy()))
             gradients = tape.gradient(loss, model.trainable_variables)
@@ -224,18 +224,21 @@ def main():
     ing_id_list_0 = model(im_0, start)[0][0] # len 20 list of ingredient IDs
     ing_id_list_1 = model(im_1, start)[0][0] # len 20 list of ingredient IDs
 
-    def ingredient_ids_to_strings(id_list):
-        return [reverse_vocab[ing_id.numpy()] for ing_id in id_list]
+    def ingredient_ids_to_strings(id_list, from_tensor=False):
+        if from_tensor:
+            return [reverse_vocab[ing_id.numpy()] for ing_id in id_list]
+        else:
+            return [reverse_vocab[ing_id] for ing_id in id_list]
 
     print("Image 0 prediction:")
-    print(ingredient_ids_to_strings(ing_id_list_0))
+    print(ingredient_ids_to_strings(ing_id_list_0, from_tensor=True))
     print("Image 0 ground truth:")
     print(ingredient_ids_to_strings(train_ings_label[0]))
     plt.imshow(im_0[0])
     plt.show()
 
     print("Image 1 prediction:")
-    print(ingredient_ids_to_strings(ing_id_list_1))
+    print(ingredient_ids_to_strings(ing_id_list_1, from_tensor=True))
     print("Image 1 ground truth:")
     print(ingredient_ids_to_strings(train_ings_label[127]))
     plt.imshow(im_1[0])
