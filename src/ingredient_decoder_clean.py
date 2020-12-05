@@ -227,13 +227,17 @@ def main():
     def ingredient_ids_to_strings(id_list):
         return [reverse_vocab[ing_id.numpy()] for ing_id in id_list]
 
-    print("Image 0 prediction: ")
+    print("Image 0 prediction:")
     print(ingredient_ids_to_strings(ing_id_list_0))
+    print("Image 0 ground truth:")
+    print(ingredient_ids_to_strings(train_ings_label[0]))
     plt.imshow(im_0[0])
     plt.show()
 
-    print("Image 1 prediction: ")
+    print("Image 1 prediction:")
     print(ingredient_ids_to_strings(ing_id_list_1))
+    print("Image 1 ground truth:")
+    print(ingredient_ids_to_strings(train_ings_label[127]))
     plt.imshow(im_1[0])
     plt.show()
 

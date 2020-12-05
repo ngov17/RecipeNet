@@ -32,8 +32,8 @@ def preprocess_image(image_path, is_train=True):
         start_r = random.randint(0, newshape[0]-224)
         start_c = random.randint(0, newshape[1]-224)
     else:
-        start_r = (newshape[0] - 224) / 2
-        start_c = (newshape[1] - 224) / 2
+        start_r = (newshape[0] - 224) // 2
+        start_c = (newshape[1] - 224) // 2
     image = image[start_r:start_r+224, start_c:start_c+224, :]
     return image
 
