@@ -2,11 +2,12 @@ import sys, os
 import numpy as np
 from PIL import Image
 
-classes_path = "../data/classes_Recipes5k.txt"
-ingredients_path = "../data/ingredients_simplified_Recipes5k.txt"
-images = "../data/images/"
-train_image_path = "../data/train_images.txt"
-test_image_path = "../data/test_images.txt"
+data_path = os.path.join("..", "data")
+classes_path = os.path.join(data_path, "classes_Recipes5k.txt")
+ingredients_path = os.path.join(data_path, "ingredients_simplified_Recipes5k.txt")
+images = os.path.join(data_path, "images")
+train_image_path = os.path.join(data_path, "train_images.txt")
+test_image_path = os.path.join(data_path, "test_images.txt")
 
 PAD_TOKEN = "*PAD*"
 STOP_TOKEN = "*STOP*"
@@ -104,9 +105,11 @@ def get_data(classes_path, ingredients_path, images, train_image_path, test_imag
     test_file = open(test_image_path, "r")
 
     for line in train_file:
-        train_list.append(images + line.rstrip())
+        splitline = line.rstrip().split('/')
+        train_list.append(os.path.join(images, splitline[0], splitline[1]))
     for line in test_file:
-        test_list.append(images + line.rstrip())
+        splitline = line.rstrip().split('/')
+        test_list.append(os.path.join(images, splitline[0], splitline[1]))
 
     for r, d, f in os.walk(images):
         for file in f:
@@ -116,11 +119,12 @@ def get_data(classes_path, ingredients_path, images, train_image_path, test_imag
                 str += word + " "
             str = str[:-1]
             if str in ingredients_dict:
-                if os.path.join(r, file) in train_list:
-                    train_images.append(np.asarray(Image.open(os.path.join(r, file))))
+                pth = os.path.join(r, file)
+                if pth in train_list:
+                    train_images.append(np.asarray(Image.open(pth)))
                     train_ingredient_list.append(ingredients_dict[str].split(","))
-                elif os.path.join(r, file) in test_list:
-                    test_images.append(np.asarray(Image.open(os.path.join(r, file))))
+                elif pth in test_list:
+                    test_images.append(np.asarray(Image.open(pth)))
                     test_ingredient_list.append(ingredients_dict[str].split(","))
 
     # resize images to (224, 224, 3)
