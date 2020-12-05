@@ -24,6 +24,7 @@ class Ingredient_Decoder(tf.keras.Model):
         self.window_size = WINDOW_SZ
 
         # Define batch size and optimizer/learning rate
+
         self.batch_size = 64
         self.embedding_size = 512
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
@@ -207,15 +208,14 @@ def main():
     train_image = train_image[indices]
     train_ings_label = train_ings_label[indices]
 
-    num_epochs = 10
 
+    num_epochs = 10
     for n in range(num_epochs):
         print("Epoch " + str(n))
         for j in range(0, train_ingredients.shape[0] - 64, 64):
             train_img = train_image[j:j + 64]
             train = train_ings[j:j + 64]
             labels = train_ings_label[j:j + 64]
-
             with tf.GradientTape() as tape:
                 # sampled_ids, logits = model(train_img, train)
                 # USE THIS VERSION IF USING TEACHER FORCING
@@ -224,7 +224,6 @@ def main():
                 print("loss at step " + str(j) + " = " + str(loss.numpy()))
             gradients = tape.gradient(loss, model.trainable_variables)
             model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-
     # model is trained
     image = np.array([test_image[0]])
     image1 = np.array([test_image[127]])
