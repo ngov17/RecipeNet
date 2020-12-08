@@ -203,21 +203,44 @@ def train(model, train_image_paths, train_ings, train_ings_labels, num_epochs=1,
             model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
 def test(model, test_image_paths, test_ings, test_ings_labels, num_epochs=1, shuffle=True):
-    indices = np.arange(train_ings.shape[0])
+    indices = np.arange(test_ings.shape[0])
     ings = []
     truth = []
     for j in range(0, test_ings.shape[0] - model.batch_size, model.batch_size):
         batch_indices = indices[j:j + model.batch_size]
-        batch_train_image_paths = [train_image_paths[idx] for idx in batch_indices] # Have to do it like this because train_image is a list of strings now and can't use numpy's array indexing
+        batch_test_image_paths = [test_image_paths[idx] for idx in batch_indices] # Have to do it like this because train_image is a list of strings now and can't use numpy's array indexing
         test_img = get_image_batch(batch_test_image_paths, is_train=True)
         test_ing = test_ings[batch_indices]
         labels = test_ings_labels[batch_indices]
         start = [[START_INDEX]]
         ings.append(model(test_img,start)[0])
         truth.append(labels)
+    ings = np.concatenate(ings,axis=0)
+    truth = np.concatenate(truth,axis=0)
     print(np.array(ings).shape)
     print(np.array(truth).shape)
-
+    tp = 0
+    tn = 0
+    fp = 0
+    fn = 0
+    for i in range(ings.shape[0]):
+        predings = ings[i]
+        predings = predings[:int(np.where(predings==EOS_INDEX)[0])]
+        trueings = truth[i]
+        trueings = trueings[:int(np.where(trueings==EOS_INDEX)[0])]
+        tpcur = 0
+        fpcur = 0
+        for ing in predings:
+            if ing in trueings:
+                tp += 1
+                tpcur += 1
+            else:
+                fp += 1
+                fpcur += 1
+        fn += len(trueings)-tpcur
+        #tn += len(vocab)-len(predings)
+    f1 = float(tp)/(tp+(1.0/2.0*(fp+fn)))
+    print("F1 score is: " + str(f1))
 
 def main():
     print("PREPROCESSING STARTING")
@@ -235,7 +258,7 @@ def main():
     # model is trained
     im_0 = get_image_batch([train_image_paths[0]], is_train=False)
     im_1 = get_image_batch([train_image_paths[127]], is_train=False)
-    print(f"im_0 shape: {im_0.shape}") # Should be (1, 224, 224, 3)
+    #print(f"im_0 shape: {im_0.shape}") # Should be (1, 224, 224, 3)
     start = [[START_INDEX]]
     ing_id_list_0 = model(im_0, start)[0][0] # len 20 list of ingredient IDs
     ing_id_list_1 = model(im_1, start)[0][0] # len 20 list of ingredient IDs
@@ -250,15 +273,18 @@ def main():
     print(ingredient_ids_to_strings(ing_id_list_0, from_tensor=True))
     print("Image 0 ground truth:")
     print(ingredient_ids_to_strings(train_ings_label[0]))
-    plt.imshow(im_0[0])
-    plt.show()
+    #plt.imshow(im_0[0])
+    #plt.show()
 
     print("Image 1 prediction:")
     print(ingredient_ids_to_strings(ing_id_list_1, from_tensor=True))
     print("Image 1 ground truth:")
     print(ingredient_ids_to_strings(train_ings_label[127]))
-    plt.imshow(im_1[0])
-    plt.show()
+    #plt.imshow(im_1[0])
+    #plt.show()
+    test_ings = test_ingredients[:,0:20]
+    test_ings_label = test_ingredients[:,1:21]
+    test(model, test_image_paths,test_ings,test_ings_label)
 
 if __name__ == "__main__":
     main()
