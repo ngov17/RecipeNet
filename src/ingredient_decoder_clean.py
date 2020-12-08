@@ -202,6 +202,22 @@ def train(model, train_image_paths, train_ings, train_ings_labels, num_epochs=1,
             gradients = tape.gradient(loss, model.trainable_variables)
             model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
+def test(model, test_image_paths, test_ings, test_ings_labels, num_epochs=1, shuffle=True):
+    indices = np.arange(train_ings.shape[0])
+    ings = []
+    truth = []
+    for j in range(0, test_ings.shape[0] - model.batch_size, model.batch_size):
+        batch_indices = indices[j:j + model.batch_size]
+        batch_train_image_paths = [train_image_paths[idx] for idx in batch_indices] # Have to do it like this because train_image is a list of strings now and can't use numpy's array indexing
+        test_img = get_image_batch(batch_test_image_paths, is_train=True)
+        test_ing = test_ings[batch_indices]
+        labels = test_ings_labels[batch_indices]
+        start = [[START_INDEX]]
+        ings.append(model(test_img,start)[0])
+        truth.append(labels)
+    print(np.array(ings).shape)
+    print(np.array(truth).shape)
+
 
 def main():
     print("PREPROCESSING STARTING")
