@@ -43,18 +43,21 @@ def normalize_images(images):
 
     return images / 255.0
 
+
 def pad_ingredients(ingredient_list):
     """
     """
 
     padded_ingredients_list = []
     for line in ingredient_list:
+        line = list(set(line))
         padded_ing = line[:(WINDOW_SIZE - 2)]
         padded_ing = [START_TOKEN] + padded_ing + [STOP_TOKEN] + [PAD_TOKEN] * (
                 WINDOW_SIZE - len(padded_ing) - 1)
         padded_ingredients_list.append(padded_ing)
 
     return padded_ingredients_list
+
 
 def convert_to_id(vocab, sentences):
     """

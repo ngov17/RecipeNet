@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
+import tensorflow_addons as tfa
 import numpy as np
+import sys
 import math
 
 
@@ -94,8 +96,14 @@ class Multi_Headed(tf.keras.layers.Layer):
     def __init__(self, emb_sz, use_mask):
         super(Multi_Headed, self).__init__()
 
-    # TODO:
-    # Initialize heads
+        # TODO:
+        # Initialize heads
+        # self.mha = tfa.layers.MultiHeadAttention(head_size=emb_sz/3, num_heads=3, output_size=emb_sz)
+        self.head1 = Atten_Head(emb_sz, int(emb_sz/3), use_mask)
+        self.head2 = Atten_Head(emb_sz, int(emb_sz/3), use_mask)
+        self.head3 = Atten_Head(emb_sz, int(emb_sz/3), use_mask)
+
+        self.dense = tf.keras.layers.Dense(emb_sz)
 
     @tf.function
     def call(self, inputs_for_keys, inputs_for_values, inputs_for_queries):
@@ -115,8 +123,16 @@ class Multi_Headed(tf.keras.layers.Layer):
         :param inputs_for_queries: tensor of [batch_size x [ENG/FRN]_WINDOW_SIZE x input_size ]
         :return: tensor of [BATCH_SIZE x (ENG/FRN)_WINDOW_SIZE x output_size ]
         """
+        # output = self.mha([inputs_for_queries, inputs_for_keys, inputs_for_values])
+        head1_output = self.head1(inputs_for_keys, inputs_for_values, inputs_for_queries)
+        head2_output = self.head2(inputs_for_keys, inputs_for_values, inputs_for_queries)
+        head3_output = self.head3(inputs_for_keys, inputs_for_values, inputs_for_queries)
 
-        return None
+        concatenated = tf.concat([head1_output, head2_output, head3_output], axis=2)
+
+        output = self.dense(concatenated)
+
+        return output
 
 
 class Feed_Forwards(tf.keras.layers.Layer):

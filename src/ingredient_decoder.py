@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import torch
 import matplotlib.pyplot as plt
 import transformer_decoder_block as transformer
 from recipe_encoder import EncoderCNN
@@ -26,19 +27,20 @@ class Ingredient_Decoder(tf.keras.Model):
         # Define batch size and optimizer/learning rate
 
         self.batch_size = 64
+        self.img_embedding_size = 512
         self.embedding_size = 512
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
-        # Define embedding layers:
+        # Define embedding amd hidden layers:
         self.E = \
             tf.Variable(tf.random.truncated_normal([self.vocab_size, self.embedding_size], stddev=.1))
 
         # Layers
-        self.image_encoder = EncoderCNN(self.embedding_size)
-        self.ing_decoder = transformer.Transformer_Block(self.embedding_size, True)
-        self.ing_decoder1 = transformer.Transformer_Block(self.embedding_size, True)
-        self.ing_decoder2 = transformer.Transformer_Block(self.embedding_size, True)
-        self.ing_decoder3 = transformer.Transformer_Block(self.embedding_size, True)
+        self.image_encoder = EncoderCNN(self.img_embedding_size)
+        self.ing_decoder = transformer.Transformer_Block(self.embedding_size, True, multi_headed=True)
+        self.ing_decoder1 = transformer.Transformer_Block(self.embedding_size, True, multi_headed=True)
+        self.ing_decoder2 = transformer.Transformer_Block(self.embedding_size, True, multi_headed=True)
+        self.ing_decoder3 = transformer.Transformer_Block(self.embedding_size, True, multi_headed=True)
         self.dense1 = tf.keras.layers.Dense(self.vocab_size)
 
     def call(self, images, ingredients, teacher_forcing=False):
@@ -79,9 +81,9 @@ class Ingredient_Decoder(tf.keras.Model):
 
         if teacher_forcing:
             # Teacher Forcing:
-            img_features = self.image_encoder(images, keep_cnn_gradients=True)
+            img_features = self.image_encoder(images)
             embeddings_ing = tf.nn.embedding_lookup(self.E, ingredients)
-            decoded_layer = self.ing_decoder(embeddings_ing, img_features)  # bsz * 1 * 512
+            decoded_layer = self.ing_decoder(embeddings_ing, img_features)  # bsz * 20 * 512
             decoded_layer1 = self.ing_decoder1(decoded_layer, img_features)
             decoded_layer2 = self.ing_decoder2(decoded_layer1, img_features)
             decoded_layer3 = self.ing_decoder3(decoded_layer2, img_features)
@@ -94,7 +96,7 @@ class Ingredient_Decoder(tf.keras.Model):
             sampled_ids = [first_word]
             logits = []
 
-            image_features = self.image_encoder(images, keep_cnn_gradients=True)
+            image_features = self.image_encoder(images)
 
             for i in range(WINDOW_SZ):
                 print(i)
@@ -134,9 +136,9 @@ class Ingredient_Decoder(tf.keras.Model):
         decoded_layer1 = self.ing_decoder1(decoded_layer, img_features)
         decoded_layer2 = self.ing_decoder2(decoded_layer1, img_features)
         decoded_layer3 = self.ing_decoder3(decoded_layer2, img_features)
-        prbs = self.dense1(decoded_layer3)  # 100 * 1 * 906
+        logits = self.dense1(decoded_layer3)  # 100 * 1 * 906
 
-        return prbs
+        return logits
 
     def accuracy_function(self, prbs, labels, mask):
         """
@@ -147,45 +149,71 @@ class Ingredient_Decoder(tf.keras.Model):
         accuracy = tf.reduce_mean(tf.boolean_mask(tf.cast(tf.equal(decoded_symbols, labels), dtype=tf.float32), mask))
         return accuracy
 
-    def loss(self, logits, labels):
+    def label2onehot(self, labels, vocab_sz):
+        """
+        labels: batch_size x window_size x vocab
+        outputs: batch_size x window_size x vocab size, where vocab size is onehot
+        """
+        one_hot_labels = np.zeros([labels.shape[0], labels.shape[1], vocab_sz], dtype=np.int64)
+        for i in range(labels.shape[0]):
+            one_hot = tf.one_hot(labels[i], vocab_sz)
+            one_hot_labels[i] = one_hot
+
+        return one_hot_labels
+
+    def loss(self, logits, labels, mask):
         """
         Calculates the model cross-entropy loss after one forward pass
         Please use reduce sum here instead of reduce mean to make things easier in calculating per symbol accuracy.
 
-        :param prbs:  [bsz, winsz, vocabsz] or [100, 20, 906]
+        :param logits:  [bsz, winsz, vocabsz]
         :param labels: [bsz * winsz] or [100, 20]
         :return: the loss of the model as a tensor
         """
+        # weights for each loss
+        loss_eos_w = 0.1
+        loss_ingr_w = 0.9
 
         prbs = tf.nn.softmax(logits)
         bce = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
         # EOS:
         eos_label = np.zeros_like(labels)
         eos_label[(labels == EOS_INDEX) ^ (labels == PAD_INDEX)] = 1
-        eos_pos = np.zeros_like(labels)
+        eos_pos = np.zeros_like(labels, dtype='float32')
         eos_pos[(labels == EOS_INDEX)] = 1
-        eos_head = np.zeros_like(labels)
+        eos_head = np.zeros_like(labels, dtype='float32')
         eos_head[(labels != PAD_INDEX) & (labels != EOS_INDEX)] = 1
         prb_eos = prbs[:, :, EOS_INDEX]
-        loss_eos = tf.reduce_sum(bce(eos_label, prb_eos))
+        loss_eos = bce(eos_label, prb_eos)
+        loss_eos = tf.reshape(loss_eos, (loss_eos.shape[0], 1))
+        loss_eos = 0.5*tf.reduce_sum((loss_eos * eos_pos), axis=1) / (tf.reduce_sum(eos_pos, axis=1) + 1e-6) + \
+                                  0.5*tf.reduce_sum((loss_eos * eos_head), axis=1) / (tf.reduce_sum(eos_head, axis=1) + 1e-6)
+        loss_eos = tf.reduce_mean(loss_eos)
         print(loss_eos)
         # Ingredient Loss:
-        pooled_prbs = tf.math.reduce_max(prbs, 1)   # 100 * 906
-        ingr_labels = np.zeros_like(pooled_prbs)  # 100 * 906
-        for i in range(self.batch_size):
-            ingr_labels[i][labels[i]] = 1
-            ingr_labels[i][PAD_INDEX] = 0
-            ingr_labels[i][EOS_INDEX] = 0
+        # prbs = tf.boolean_mask(prbs, mask, axis=1)
+        pooled_prbs = tf.math.reduce_max(prbs, 1)   # bsz * 906
+        pooled_prbs = tf.gather(pooled_prbs, labels, batch_dims=1)
+        # pooled_prbs, indices_prbs = tf.math.top_k(pooled_prbs, k=20)
+        pooled_prbs = tf.math.multiply(pooled_prbs, mask)     # ignore loss from eos and pad token
+        #ingr_labels = np.zeros_like(pooled_prbs)  # 100 * 906
+        # ingr_labels = self.label2onehot(labels, self.vocab_size) # bsz x wsz x vocabsize
+        # for i in range(self.batch_size):
+        #     ingr_labels[i][labels[i]] = 1
             # for j in range(WINDOW_SZ):
             #     if (labels[i][j] != PAD_INDEX) & (labels[i][j] != EOS_INDEX):
             #         ingr_labels[i, labels[i][j]] = 1
 
-        loss_ingrs = bce(ingr_labels, pooled_prbs)
-        print(loss_ingrs.shape)
-        loss_ingrs = tf.reduce_sum(loss_ingrs)
+
+        loss_ingrs = bce(eos_head, pooled_prbs)
+        # loss_ingrs = tf.math.multiply(loss_ingrs, mask)     # ignore loss from eos and pad token
+        # loss_ingrs = tf.reduce_sum(loss_ingrs, axis=1)
+        loss_ingrs = tf.reduce_mean(loss_ingrs)
+        # loss_ingrs = tf.boolean_mask(loss_ingrs, mask)
+        # print(loss_ingrs)
         print(loss_ingrs)
 
-        return loss_eos + loss_ingrs
+        return loss_ingr_w*loss_ingrs + loss_eos_w*loss_eos
 
 
 def main():
@@ -198,11 +226,13 @@ def main():
     print(train_ingredients.shape[0])
 
     model = Ingredient_Decoder(len(vocab))
-    train_ings = np.zeros([train_ingredients.shape[0], 20], dtype=np.int32)
-    train_ings_label = np.zeros([train_ingredients.shape[0], 20], dtype=np.int32)
+    train_ings = np.zeros([train_ingredients.shape[0], WINDOW_SZ], dtype=np.int64)
+    train_ings_label = np.zeros([train_ingredients.shape[0], WINDOW_SZ], dtype=np.int64)
+    mask = np.ones([train_ingredients.shape[0], WINDOW_SZ], dtype=np.int64)
     for i in range(train_ingredients.shape[0]):
         train_ings[i] = train_ingredients[i][:20]
         train_ings_label[i] = train_ingredients[i][-20:]
+    mask[(train_ings_label == pad_token_idx) ^ (train_ings_label == EOS_INDEX)] = 0
 
     # test one forward pass:
     # sample_ids, logits = model(train_image[:100], train_ings[:100])
@@ -210,49 +240,58 @@ def main():
     # print(sample_ids)
     # print(logits.shape)
 
-    # shuffle inputs:
-    indices = np.arange(train_ings.shape[0])
-    np.random.shuffle(indices)
-    train_ings = train_ings[indices]
-    train_image = train_image[indices]
-    train_ings_label = train_ings_label[indices]
-
-    num_epochs = 1
-    for n in range(num_epochs):
-        print("Epoch " + str(n))
-        for j in range(0, train_ingredients.shape[0] - 64, 64):
-            train_img = train_image[j:j + 64]
-            train = train_ings[j:j + 64]
-            labels = train_ings_label[j:j + 64]
-            with tf.GradientTape() as tape:
-                sampled_ids, logits = model(train_img, train)
-                # USE THIS VERSION IF USING TEACHER FORCING
-                # logits = model(train_img, train, teacher_forcing=True)
-                loss = model.loss(logits, labels)
-                print("loss at step " + str(j) + " = " + str(loss.numpy()))
-            gradients = tape.gradient(loss, model.trainable_variables)
-            model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-    # model is trained
-    image = np.array([test_image[0]])
-    image1 = np.array([test_image[127]])
-    print(image.shape)
-    ingr = [[train_ingredients[0][0]]]  # 1st token
-
-    sampled_ids, logits = model.call(image, ingr)
-    sampled_ids1, logits1 = model.call(image1, ingr)
-
-    sampled_ids = sampled_ids[0]    # size 20
-    sampled_ids1 = sampled_ids1[0]
-
     def print_ingredients(sampled_ids):
         ings = []
         for ing in sampled_ids:
             ings.append(reverse_vocab[ing.numpy()])
         return ings
 
+    num_epochs = 1
+    for n in range(num_epochs):
+        print("Epoch " + str(n))
+        # shuffle inputs:
+        indices = np.arange(train_ings.shape[0])
+        np.random.shuffle(indices)
+        train_ings = train_ings[indices]
+        train_image = train_image[indices]
+        train_ings_label = train_ings_label[indices]
+        mask = mask[indices]
+        for j in range(0, train_ingredients.shape[0] - 64, 64):
+            train_img = train_image[j:j + 64]
+            train = train_ings[j:j + 64]
+            labels = train_ings_label[j:j + 64]
+            mask_lab = mask[j:j+64]
+            with tf.GradientTape() as tape:
+                sampled_ids, logits = model(train_img, train)
+                # USE THIS VERSION IF USING TEACHER FORCING
+                # logits = model(train_img, train, teacher_forcing=True)
+                loss = model.loss(logits, labels, mask_lab)
+                print("loss at step " + str(j) + " = " + str(loss.numpy()))
+                print(print_ingredients(sampled_ids[0]))
+            gradients = tape.gradient(loss, model.trainable_variables)
+            model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    # model is trained
+    image = np.array([test_image[176]])
+    image1 = np.array([test_image[234]])
+    image2 = np.array([test_image[69]])
+    image3 = np.array([test_image[489]])
+    ingr = [[train_ingredients[0][0]]]  # 1st token
+
+    sampled_ids, logits = model.call(image, ingr)
+    sampled_ids1, logits1 = model.call(image1, ingr)
+    sampled_ids2, logits2 = model.call(image2, ingr)
+    sampled_ids3, logits3 = model.call(image3, ingr)
+
+    sampled_ids = sampled_ids[0]    # size 1 x 20
+    sampled_ids1 = sampled_ids1[0]
+    sampled_ids2 = sampled_ids2[0]  # size 1 x 20
+    sampled_ids3 = sampled_ids3[0]
+
     # print the image
-    image = test_image[565]
-    image1 = test_image[17]
+    image = test_image[176]
+    image1 = test_image[234]
+    image2 = test_image[69]
+    image3 = test_image[489]
     print("IMAGE 0 prediction :")
     print(print_ingredients(sampled_ids))
 
@@ -263,6 +302,18 @@ def main():
     print(print_ingredients(sampled_ids1))
 
     plt.imshow(image1)
+    plt.show()
+
+    print("IMAGE 2 prediction :")
+    print(print_ingredients(sampled_ids2))
+
+    plt.imshow(image2)
+    plt.show()
+
+    print("IMAGE 3 prediction :")
+    print(print_ingredients(sampled_ids3))
+
+    plt.imshow(image3)
     plt.show()
 
 
