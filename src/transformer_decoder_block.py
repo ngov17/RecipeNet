@@ -99,9 +99,8 @@ class Multi_Headed(tf.keras.layers.Layer):
         # TODO:
         # Initialize heads
         # self.mha = tfa.layers.MultiHeadAttention(head_size=emb_sz/3, num_heads=3, output_size=emb_sz)
-        self.head1 = Atten_Head(emb_sz, int(emb_sz/3), use_mask)
-        self.head2 = Atten_Head(emb_sz, int(emb_sz/3), use_mask)
-        self.head3 = Atten_Head(emb_sz, int(emb_sz/3), use_mask)
+        self.head1 = Atten_Head(emb_sz, int(emb_sz/2), use_mask)
+        self.head2 = Atten_Head(emb_sz, int(emb_sz/2), use_mask)
 
         self.dense = tf.keras.layers.Dense(emb_sz)
 
@@ -126,9 +125,8 @@ class Multi_Headed(tf.keras.layers.Layer):
         # output = self.mha([inputs_for_queries, inputs_for_keys, inputs_for_values])
         head1_output = self.head1(inputs_for_keys, inputs_for_values, inputs_for_queries)
         head2_output = self.head2(inputs_for_keys, inputs_for_values, inputs_for_queries)
-        head3_output = self.head3(inputs_for_keys, inputs_for_values, inputs_for_queries)
 
-        concatenated = tf.concat([head1_output, head2_output, head3_output], axis=2)
+        concatenated = tf.concat([head1_output, head2_output], axis=2)
 
         output = self.dense(concatenated)
 

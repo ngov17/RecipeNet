@@ -246,7 +246,7 @@ def main():
             ings.append(reverse_vocab[ing.numpy()])
         return ings
 
-    num_epochs = 1
+    num_epochs = 5
     for n in range(num_epochs):
         print("Epoch " + str(n))
         # shuffle inputs:

@@ -13,7 +13,8 @@ class EncoderCNN(tf.keras.Model):
         self.resnet = tf.keras.applications.ResNet50(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
         self.resnet.trainable = False
         self.conv2D = tf.keras.layers.Conv2D(self.h1, 1, activation='relu', padding='SAME')
-        self.conv2D1 = tf.keras.layers.Conv2D(embed_size, 1, padding='SAME')
+        self.conv2D1 = tf.keras.layers.Conv2D(self.h1, 1, activation='relu', padding='SAME')
+        self.conv2D2 = tf.keras.layers.Conv2D(embed_size, 1, padding='SAME')
         self.drop2D = tf.keras.layers.SpatialDropout2D(dropout)
 
     def call(self, images, keep_cnn_gradients=False):
@@ -25,9 +26,14 @@ class EncoderCNN(tf.keras.Model):
         mean1, variance1 = tf.nn.moments(conv2D_output, [0, 1, 2])
         conv2D_output = tf.nn.batch_normalization(conv2D_output, mean1, variance1,
                                                   offset=None, scale=None, variance_epsilon=1e-5)
-        features = self.conv2D1(conv2D_output)
-        mean2, variance2 = tf.nn.moments(features, [0, 1, 2])
-        features = tf.nn.batch_normalization(features, mean2, variance2,
+        conv2D1_output = self.conv2D1(conv2D_output)
+        mean2, variance2 = tf.nn.moments(conv2D1_output, [0, 1, 2])
+        conv2D1_output = tf.nn.batch_normalization(conv2D1_output, mean2, variance2,
+                                                  offset=None, scale=None, variance_epsilon=1e-5)
+
+        features = self.conv2D2(conv2D1_output)
+        mean3, variance3 = tf.nn.moments(features, [0, 1, 2])
+        features = tf.nn.batch_normalization(features, mean3, variance3,
                                                   offset=None, scale=None, variance_epsilon=1e-5)
 
         features = self.drop2D(features)
@@ -41,6 +47,7 @@ def main():
         = get_data(classes_path, ingredients_path, images, train_image_path, test_image_path)
 
     train = train_image[:100]
+    print("we don't really need a main function here (recipe_encoder.py)")
 
     model = EncoderCNN(512)
 
